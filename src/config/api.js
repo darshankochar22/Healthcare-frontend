@@ -1,7 +1,7 @@
 // Backend API Configuration
 export const API_CONFIG = {
   baseURL: import.meta.env.PROD
-    ? "https://your-backend-url.com/api" // Replace with your deployed backend URL
+    ? "https://healthcare-backend-h52l.onrender.com/api"
     : "http://localhost:8000/api",
   endpoints: {
     googleAuth: "/auth/google",
@@ -18,26 +18,59 @@ export const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem("token");
 
   const defaultOptions = {
+    method: "GET",
     headers: {
       "Content-Type": "application/json",
+      Accept: "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
     },
+    credentials: "include", // Important for CORS with credentials
+    mode: "cors", // Explicitly set CORS mode
   };
 
   const config = { ...defaultOptions, ...options };
 
   try {
     const response = await fetch(url, config);
-    const data = await response.json();
+
+    // Handle non-JSON responses
+    let data;
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      data = await response.text();
+    }
 
     if (!response.ok) {
-      throw new Error(data.message || "API request failed");
+      throw new Error(
+        data.message ||
+          data ||
+          `HTTP ${response.status}: ${response.statusText}`
+      );
     }
 
     return data;
   } catch (error) {
     console.error("API Error:", error);
+
+    // Handle network errors
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      throw new Error("Network error: Unable to connect to server");
+    }
+
     throw error;
+  }
+};
+
+// Health check function
+export const checkBackendHealth = async () => {
+  try {
+    const response = await apiRequest(API_CONFIG.endpoints.health);
+    return response.status === "success";
+  } catch (error) {
+    console.error("Backend health check failed:", error);
+    return false;
   }
 };
 

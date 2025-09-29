@@ -16,45 +16,69 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const storedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    
-    if (storedToken && savedUser) {
-      // Verify token with backend
-      verifyToken().then(userData => {
-        if (userData) {
-          setUser(userData);
-        } else {
-          // Token is invalid, clear storage
+    const initializeAuth = async () => {
+      // Check for auth callback from backend first
+      const urlParams = new URLSearchParams(window.location.search);
+      const callbackToken = urlParams.get('token');
+      const success = urlParams.get('success');
+      const error = urlParams.get('error');
+      
+      if (callbackToken && success) {
+        localStorage.setItem('token', callbackToken);
+        // Get user profile from backend
+        try {
+          const userData = await getUserProfile();
+          if (userData) {
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+          }
+        } catch (error) {
+          console.error('Failed to get user profile after auth:', error);
+          // Clear invalid token
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
         setLoading(false);
-      }).catch(() => {
+        return;
+      }
+      
+      if (error) {
+        console.error('Authentication error:', error);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
         setLoading(false);
-      });
-    } else {
-      setLoading(false);
-    }
+        return;
+      }
 
-    // Check for auth callback from backend
-    const urlParams = new URLSearchParams(window.location.search);
-    const callbackToken = urlParams.get('token');
-    const success = urlParams.get('success');
-    
-    if (callbackToken && success) {
-      localStorage.setItem('token', callbackToken);
-      // Get user profile from backend
-      getUserProfile().then(userData => {
-        if (userData) {
-          setUser(userData);
-          localStorage.setItem('user', JSON.stringify(userData));
+      // Check if user is already logged in
+      const storedToken = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
+      
+      if (storedToken && savedUser) {
+        // Verify token with backend
+        try {
+          const userData = await verifyToken();
+          if (userData) {
+            setUser(userData);
+          } else {
+            // Token is invalid, clear storage
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
+        } catch (error) {
+          console.error('Token verification failed:', error);
+          // Clear invalid storage
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
         }
-      });
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
+      }
+      
+      setLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const login = (userData) => {
