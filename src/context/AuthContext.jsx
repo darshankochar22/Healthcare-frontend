@@ -31,15 +31,20 @@ export const AuthProvider = ({ children }) => {
           if (userData) {
             setUser(userData);
             localStorage.setItem('user', JSON.stringify(userData));
+            // Redirect to home page after successful login
+            window.location.href = '/';
+          } else {
+            // If no user data, redirect to home anyway
+            window.location.href = '/';
           }
         } catch (error) {
           console.error('Failed to get user profile after auth:', error);
           // Clear invalid token
           localStorage.removeItem('token');
           localStorage.removeItem('user');
+          // Redirect to home page
+          window.location.href = '/';
         }
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
         setLoading(false);
         return;
       }
